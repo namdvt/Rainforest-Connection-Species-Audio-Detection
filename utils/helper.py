@@ -22,3 +22,14 @@ def write_log(location, epoch, train_loss, val_loss, val_epoch_rank):
     f.close()
 
 
+def write_log_embedding(location, epoch, train_loss, val_loss):
+    if epoch == 0:
+        f = open(location + '/log.txt', 'w+')
+        f.write('epoch\t\ttrain_loss\t\tval_loss\n')
+    else:
+        f = open(location + '/log.txt', 'a+')
+
+    f.write(str(epoch) + '\t' + str(train_loss) + '\t' + str(val_loss) + '\n')
+
+    f.close()
+

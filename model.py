@@ -91,19 +91,28 @@ class Model(nn.Module):
         super(Model, self).__init__()
         # backbone
         # self.backbone = models.resnet50(pretrained=True)
-        self.backbone = timm.create_model(backbone, pretrained=True)
+        backbone = timm.create_model(backbone, pretrained=True)
+
         # self.backbone = ResNet(Bottleneck, [3, 4, 6, 3]) # r50
         # self.backbone = ResNet(BasicBlock, [2, 2, 2, 2]) #r18
-        # self.backbone = ResNet(BasicBlock, [1, 1, 1, 1]) #r9
+        # backbone = ResNet(BasicBlock, [1, 1, 1, 1]) #r9
+        self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1]))
         self.classify = nn.Sequential(
-            Linear(1000, 512),
+            # Linear(1000, 512),
             nn.Linear(512, 24),
             nn.Sigmoid()
         )
+        # self._freeze()
 
-    def forward(self, x):
+    def _freeze(self):
+        for p in self.backbone.parameters():
+            p.requires_grad = False
+
+    def forward(self, x, classify=True):
         x = self.backbone(x)
-        x = self.classify(x)
+        x = x.squeeze()
+        if classify:
+            x = self.classify(x)
 
         return x
 
