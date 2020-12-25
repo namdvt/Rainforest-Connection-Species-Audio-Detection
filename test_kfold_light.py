@@ -23,9 +23,9 @@ print('inferencing model ' + backbone)
 
 if __name__ == '__main__':
     model = Model(backbone=backbone).to(device)
-    weights = glob('output/best_loss/*.pth')
+    weights = glob('output/*.pth')
     # weights = ['output/regnetx_064_1.pth', 'output/regnetx_064_2.pth']
-    test_data = glob('data_waveform/test/waveform/*.npy')
+    test_data = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test/waveform/*.npy')
     test_data.sort()
     final_result = list()
     submission_mean = pd.DataFrame(
@@ -67,18 +67,18 @@ if __name__ == '__main__':
                 final_results[file_name] = list()
                 final_results[file_name].append(output)
 
-    # mean
-    for file_name in final_results.keys():
-        result = torch.stack(final_results[file_name]).mean(dim=0).tolist()
-        result.insert(0, file_name)
-        submission_mean = submission_mean.append(pd.Series(result, index=submission_mean.columns), ignore_index=True)
-    submission_mean.to_csv('submission/legacy_seresnet34_best_loss_mean.csv', index=False)
+    # # mean
+    # for file_name in final_results.keys():
+    #     result = torch.stack(final_results[file_name]).mean(dim=0).tolist()
+    #     result.insert(0, file_name)
+    #     submission_mean = submission_mean.append(pd.Series(result, index=submission_mean.columns), ignore_index=True)
+    # submission_mean.to_csv('submission/53_best_loss_mean.csv', index=False)
 
     # gmean
     for file_name in final_results.keys():
         result = gmean(torch.stack(final_results[file_name]).cpu(), axis=0).tolist()
         result.insert(0, file_name)
         submission_gmean = submission_gmean.append(pd.Series(result, index=submission_gmean.columns), ignore_index=True)
-    submission_gmean.to_csv('submission/legacy_seresnet34_best_loss_gmean.csv', index=False)
+    submission_gmean.to_csv('submission/53_light.csv', index=False)
 
     print()

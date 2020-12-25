@@ -40,7 +40,7 @@ if __name__ == '__main__':
                  's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 's22', 's23'])
 
 
-    test_data = glob('data_waveform/test/waveform/*.npy')
+    test_data = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test/waveform/*.npy')
     test_data.sort()
 
     for address in tqdm(test_data):
@@ -77,5 +77,5 @@ if __name__ == '__main__':
         submission_gmean = submission_gmean.append(pd.Series(result_gmean, index=submission_gmean.columns), ignore_index=True)
     
     # submission_mean.to_csv('submission/legacy_seresnet34_mean.csv', index=False)
-    submission_gmean.to_csv('submission/legacy_seresnet34_best_acc.csv', index=False)
+    submission_gmean.to_csv('submission/53_fast.csv', index=False)
     print('finish')
