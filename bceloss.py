@@ -66,7 +66,7 @@ class BCELoss(nn.Module, ABC):
             output_tp = torch.stack(output_tp).to(device)
             target_tp = torch.stack(target_tp).to(device)
             # tp_loss_lsep = lsep_loss_stable(output_tp, target_tp)
-            loss_bce = self.bce_loss(output_tp, target_tp)
+            tp_loss = self.bce_loss(output_tp, target_tp)
         else:
             tp_loss = torch.zeros(1).to(device)
 
@@ -78,27 +78,12 @@ class BCELoss(nn.Module, ABC):
         else:
             fp_loss = torch.zeros(1).to(device)
 
-        # no label bce loss
-        if output_nolabel.__len__() > 0:
-            output_nolabel = torch.stack(output_nolabel).to(device)
-            target_nolabel = torch.stack(target_nolabel).to(device)
-            nolabel_loss = lsep_loss(output_nolabel, target_nolabel)
-        else:
-            nolabel_loss = torch.zeros(1).to(device)
-
-        # print(tp_loss.item())
-        # print(fp_loss.item())
-        # alpha = 0.9
-        # print(nolabel_loss)
-
-        tp_loss = loss_bce
-
         if epoch < 30:
             ratio = 0
         else:
             ratio = np.min((np.floor((epoch - 30) / 10) / 10, 0.4))
 
-        return (0.8 - ratio) * tp_loss + ratio * nolabel_loss + 0.2 * fp_loss
+        return self.alpha * tp_loss + (1 - self.alpha) * fp_loss
 
 
 class CosineMarginLoss(nn.Module):

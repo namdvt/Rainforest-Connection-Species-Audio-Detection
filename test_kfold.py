@@ -13,7 +13,7 @@ from scipy.stats.mstats import gmean
 
 from model import Model
 
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
 backbone = 'legacy_seresnet34'
 sr = 48000
     
@@ -23,7 +23,7 @@ print('inferencing model ' + backbone)
 
 if __name__ == '__main__':
     models = list()
-    weights = glob('output/best_acc/*.pth')
+    weights = glob('output/60/*.pth')
     # weights = ['output/regnetx_064_1.pth', 'output/regnetx_064_2.pth']
     for weight in weights:
         model = Model(backbone=backbone).to(device)
@@ -77,5 +77,5 @@ if __name__ == '__main__':
         submission_gmean = submission_gmean.append(pd.Series(result_gmean, index=submission_gmean.columns), ignore_index=True)
     
     # submission_mean.to_csv('submission/legacy_seresnet34_mean.csv', index=False)
-    submission_gmean.to_csv('submission/53_fast.csv', index=False)
+    submission_gmean.to_csv('submission/60_fast.csv', index=False)
     print('finish')

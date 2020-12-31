@@ -13,8 +13,8 @@ from scipy.stats.mstats import gmean
 
 from model import Model
 
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
-backbone = 'legacy_seresnet34'
+device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
+backbone = 'resnext50_32x4d'
 sr = 48000
     
 # model.eval()
@@ -79,6 +79,6 @@ if __name__ == '__main__':
         result = gmean(torch.stack(final_results[file_name]).cpu(), axis=0).tolist()
         result.insert(0, file_name)
         submission_gmean = submission_gmean.append(pd.Series(result, index=submission_gmean.columns), ignore_index=True)
-    submission_gmean.to_csv('submission/53_light.csv', index=False)
+    submission_gmean.to_csv('submission/62.csv', index=False)
 
     print()

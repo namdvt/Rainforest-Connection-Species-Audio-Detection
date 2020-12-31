@@ -22,7 +22,7 @@ print('inferencing model ' + backbone)
 if __name__ == '__main__':
     # load model
     models = list()
-    weights = glob('output/0.891/*.pth')
+    weights = glob('output/*.pth')
     for weight in weights:
         model = Model(backbone=backbone).to(device)
         model.load_state_dict(torch.load(weight, map_location=device))
@@ -36,18 +36,22 @@ if __name__ == '__main__':
     for row in tp.iterrows():
         tp_list.add(row[1]['recording_id'])
 
-    list_train = glob('/home/cybercore/oldhome/datasets/rain_forest/train/*.flac')
+    # list_train = glob('/home/cybercore/oldhome/datasets/rain_forest/train/*.flac')
+    list_test = glob('/home/cybercore/oldhome/datasets/rain_forest/test/*.flac')
+
 
     # pseudo_label
-    for test in tqdm(list_train):
-        if raw.split('/')[-1].split('.')[0] in tp_list:
-            continue
+    bce_loss = torch.nn.BCELoss()
+    
+    for sample in tqdm(list_test):
+        # if sample.split('/')[-1].split('.')[0] in tp_list:
+        #     continue
         
-        waveform, _ = lib.load(raw, sr=sr, res_type='kaiser_fast')
-        waveform = np.load(test)
+        waveform, _ = lib.load(sample, sr=sr, res_type='kaiser_fast')
+        # waveform = np.load(sample)
 
         batch = list()
-        for idx in range(0, 50*sr, 2*sr):
+        for idx in range(0, 50*sr, 5*sr):
             segment = waveform[idx:idx + 10*sr]
             spec = lib.feature.melspectrogram(segment, sr=sr)
             spec = lib.power_to_db(spec)
@@ -64,11 +68,13 @@ if __name__ == '__main__':
 
             outputs = torch.cat(outputs)
             outputs = gmean(outputs.cpu())
-            prop = outputs.max()
 
-            if prop >= 0.95:
-                outputs[outputs >= 0.5] = 1
-                outputs[outputs < 0.5] = 0
-                np.save('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test_pseudo/' + test.split('/')[-1].split('.')[0] + '_' + str(idx / sr) + '_' + str(prop) + '_' + str(outputs) + '.npy', segment)
+            predicts = outputs.copy()
+            predicts[predicts >= 0.5] = 1
+            predicts[predicts < 0.5] = 0
+
+            loss = bce_loss(torch.tensor(outputs), torch.tensor(predicts))
+            if loss <= 0.01 and predicts.sum()>0:
+                np.save('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test_pseudo/' + sample.split('/')[-1].split('.')[0] + '_' + str(idx / sr) + '_' + str(predicts.astype(int)) + '.npy', segment)
 
     print('finish')

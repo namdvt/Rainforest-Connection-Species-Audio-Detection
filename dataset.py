@@ -53,35 +53,38 @@ class SoundDataset(Dataset):
         # self.background = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/background/*.npy')
         self.species = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/species/*.npy')
         self.fp_data = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/fp/*.npy')
-        # self.unlabel = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/train_pseudo/*.npy')
+        self.unlabel = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/train_pseudo/*.npy') + glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test_pseudo/*.npy') 
         self.length = length
         self.augment = augment
         self.augmenter = Compose([
-            AddGaussianNoise(min_amplitude=0.005, max_amplitude=0.005, p=0.5),
-            TimeStretch(min_rate=0.8, max_rate=1, p=0.5)
+            AddGaussianNoise(min_amplitude=0.005, max_amplitude=0.005, p=0.2),
+            TimeStretch(min_rate=0.8, max_rate=1, p=0.2)
         ])
 
-    def get_spectrogram(self, sound_address, pad=False):
+    def get_spectrogram(self, sound_address, pad=False, augment=False):
         # load, augment and crop
         waveform = np.load(sound_address)
+
+        if augment:
+            waveform = self.augmenter(waveform, sample_rate=sr)
         if pad:
             waveform = crop_pad(waveform, self.length)
+
 
         # spectrogram
         spec = lib.feature.melspectrogram(waveform, sr=sr)
         spec = lib.power_to_db(spec)
         spec = normalize(spec)
-        # assert spec.shape == (128, 938)
 
         return spec
 
-    def get_tp(self, file_name):
+    def get_tp(self, file_name, augment=False):
         while True:
             sample = random.choice(self.tp_data)
             if sample.split('/')[-1].split('_')[0] == file_name:
                 label = torch.tensor(np.array(sample.split('[')[1].split(']')[0].split(' '), dtype='float32'))
 
-                return self.get_spectrogram(sample), label
+                return self.get_spectrogram(sample, augment=augment), label
 
     def get_all_tp(self, file_name):
         tps = list()
@@ -92,13 +95,13 @@ class SoundDataset(Dataset):
         tps.sort()
         return tps
 
-    def get_mixed_tp(self, file_name):
+    def get_mixed_tp(self, file_name, augment=False):
         sample1, label1 = self.get_all_tp(file_name)[-1]
-        sample1 = self.get_spectrogram(sample1)
+        sample1 = self.get_spectrogram(sample1, augment=augment)
 
         random_name = random.choice(self.indexes)
         sample2, label2 = self.get_all_tp(random_name)[0]
-        sample2 = self.get_spectrogram(sample2)
+        sample2 = self.get_spectrogram(sample2, augment=augment)
 
         # mix label
         label = label1 + label2
@@ -112,15 +115,15 @@ class SoundDataset(Dataset):
 
         return sample, label
 
-    def get_species(self, file_name):
+    def get_species(self, file_name, augment=False):
         while True:
             sample = random.choice(self.species)
             if sample.split('/')[-1].split('_')[0] == file_name:
                 label = F.one_hot(torch.tensor(int(sample.split('/')[-1].split('_')[1])), 24).float()
 
-                return self.get_spectrogram(sample, pad=True), label
+                return self.get_spectrogram(sample, pad=True, augment=augment), label
 
-    def get_mixed_tp_species(self, file_name):
+    def get_mixed_tp_species(self, file_name, augment=False):
         species_name = random.choice(self.indexes)
         sample_species, label_species = self.get_species(species_name)
         shift = sample_species.shape[1]
@@ -128,7 +131,7 @@ class SoundDataset(Dataset):
         if random.choice([0, 1]): # append right
             sample_species = np.concatenate([np.zeros((128, 938 - sample_species.shape[1])), sample_species], axis=1)
             sample_tp, label_tp = self.get_all_tp(file_name)[-1]
-            sample_tp = self.get_spectrogram(sample_tp)
+            sample_tp = self.get_spectrogram(sample_tp, augment=augment)
 
             # mix spectrogram
             t = np.concatenate([np.arange(-938 + shift, 0, 1), np.arange(0, shift, 1)]) / random.randint(5, 10) - 2
@@ -137,7 +140,7 @@ class SoundDataset(Dataset):
         else: # append left
             sample_species = np.concatenate([sample_species, np.zeros((128, 938 - sample_species.shape[1]))], axis=1)
             sample_tp, label_tp = self.get_all_tp(file_name)[0]
-            sample_tp = self.get_spectrogram(sample_tp)
+            sample_tp = self.get_spectrogram(sample_tp, augment=augment)
 
             # mix spectrogram
             t = np.concatenate([np.arange(-shift, 0, 1), np.arange(0, 938 - shift, 1)]) / random.randint(5, 10) + 2
@@ -150,15 +153,15 @@ class SoundDataset(Dataset):
 
         return sample, label
 
-    def get_mixed_tp_fp(self, file_name):
+    def get_mixed_tp_fp(self, file_name, augment=False):
         fp_name = random.choice(self.fp_data)
-        sample_fp = self.get_spectrogram(fp_name)
+        sample_fp = self.get_spectrogram(fp_name, augment=augment)
         shift = sample_fp.shape[1]
 
         if random.choice([0, 1]): # append right
             sample_fp = np.concatenate([np.zeros((128, 938 - sample_fp.shape[1])), sample_fp], axis=1)
             sample_tp, label_tp = self.get_all_tp(file_name)[-1]
-            sample_tp = self.get_spectrogram(sample_tp)
+            sample_tp = self.get_spectrogram(sample_tp, augment=augment)
 
             # mix spectrogram
             t = np.concatenate([np.arange(-938 + shift, 0, 1), np.arange(0, shift, 1)]) / random.randint(5, 10) - 2
@@ -167,7 +170,7 @@ class SoundDataset(Dataset):
         else: # append left
             sample_fp = np.concatenate([sample_fp, np.zeros((128, 938 - sample_fp.shape[1]))], axis=1)
             sample_tp, label_tp = self.get_all_tp(file_name)[0]
-            sample_tp = self.get_spectrogram(sample_tp)
+            sample_tp = self.get_spectrogram(sample_tp, augment=augment)
 
             # mix spectrogram
             t = np.concatenate([np.arange(-shift, 0, 1), np.arange(0, 938 - shift, 1)]) / random.randint(5, 10) + 2
@@ -187,38 +190,45 @@ class SoundDataset(Dataset):
         if self.data_type == 'train':
             prop = random.random()
             if prop <= self.prop_tp:  # tp
-                if random.choice([0, 1]):
-                    sound, label = self.get_tp(file_name)
+                tp_type = random.choice(['tp_data', 'species', 'un_label'])
+                if tp_type == 'tp_data':
+                    sound, label = self.get_tp(file_name, augment=self.augment)
                     label = torch.cat([torch.ones(1), label])
-                else:  # species
-                    sound, label = self.get_species(file_name)
+
+                if tp_type == 'species':  # species
+                    sound, label = self.get_species(file_name, augment=self.augment)
+                    label = torch.cat([torch.ones(1), label])
+
+                if tp_type == 'un_label':
+                    sample = random.choice(self.unlabel)
+                    sound = self.get_spectrogram(sample, augment=self.augment)
+                    label = torch.tensor(np.array(sample.split('[')[1].split(']')[0].split(' '), dtype='float32'))
                     label = torch.cat([torch.ones(1), label])
 
                 if self.augment and random.random() > 0.8:
                     type = random.choice(['tp_tp', 'tp_species', 'tp_fp'])
                     if type == 'tp_tp':
-                        sound, label = self.get_mixed_tp(file_name)
+                        sound, label = self.get_mixed_tp(file_name, augment=self.augment)
                     if type == 'tp_species':
-                        sound, label = self.get_mixed_tp_species(file_name)
+                        sound, label = self.get_mixed_tp_species(file_name, augment=self.augment)
                     if type == 'tp_fp':
-                        sound, label = self.get_mixed_tp_fp(file_name)
+                        sound, label = self.get_mixed_tp_fp(file_name, augment=self.augment)
 
                     label = torch.cat([torch.ones(1), label])
 
             else:  # fp
                 sound_address = random.choice(self.fp_data)
-                sound = self.get_spectrogram(sound_address, pad=True)
+                sound = self.get_spectrogram(sound_address, pad=True, augment=self.augment)
                 label = F.one_hot(torch.tensor(int(sound_address.split('/')[-1].split('_')[1])), 24).float()
                 label = torch.cat([torch.zeros(1), label])
         else:
-            sound, label = self.get_tp(file_name)
+            sound, label = self.get_tp(file_name, augment=False)
             label = torch.cat([torch.ones(1), label])
 
-        # # augment
+        # augment
         # sound = np.array(sound*255, dtype=np.uint8)
         # if self.augment:
         #     sound = A.RandomBrightness().apply(sound)
-
 
         # normalize
         sound = torch.tensor(sound)
@@ -377,9 +387,9 @@ if __name__ == '__main__':
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    loader = get_loader_1d(annotation='fold/3/train_filenames.txt', data_type='train', batch_size=2, num_workers=0,
-                        augment=True, prop_tp=0.9)
+    loader = get_loader(annotation='fold/3/train_filenames.txt', data_type='train', batch_size=2, num_workers=0,
+                        augment=False, prop_tp=0.9)
     # loader = get_loader_1type(annotation='tp_val.txt', data_type='tp', batch_size=64, num_workers=8, augment=False)
     a = 0
-    for s, l in tqdm(loader):
+    for s, m, l in tqdm(loader):
         a += 1
