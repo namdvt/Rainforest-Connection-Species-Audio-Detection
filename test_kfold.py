@@ -13,18 +13,19 @@ from scipy.stats.mstats import gmean
 
 from model import Model
 
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
-backbone = 'legacy_seresnet34'
+device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
 sr = 48000
     
-# model.eval()
+num = '21'
+# backbone = 'resnext50_32x4d'
 
-print('inferencing model ' + backbone)
 
 if __name__ == '__main__':
     models = list()
-    weights = glob('output/best_acc/*.pth')
-    # weights = ['output/regnetx_064_1.pth', 'output/regnetx_064_2.pth']
+    weights = glob('output/' + num + '/*.pth')
+    backbone = weights[0].replace('_' + weights[0].split('/')[-1].split('_')[-1], '').split('/')[-1]
+    print('inferencing model ' + backbone)
+
     for weight in weights:
         model = Model(backbone=backbone).to(device)
         model.load_state_dict(torch.load(weight, map_location=device))
@@ -32,15 +33,12 @@ if __name__ == '__main__':
         models.append(model)
         print('loaded ' + weight)
 
-    submission_mean = pd.DataFrame(
-        columns=['recording_id', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13',
-                 's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 's22', 's23'])
     submission_gmean = pd.DataFrame(
         columns=['recording_id', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13',
                  's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 's22', 's23'])
 
 
-    test_data = glob('data_waveform/test/waveform/*.npy')
+    test_data = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test/waveform/*.npy')
     test_data.sort()
 
     for address in tqdm(test_data):
@@ -64,18 +62,11 @@ if __name__ == '__main__':
                 outputs.append(output)
         outputs = torch.stack(outputs)
 
-        # mean
-        # result_mean = outputs.mean(dim=0)
-        # result_mean = result_mean.max(dim=0)[0].tolist()
-        # result_mean.insert(0, address.split('/')[-1].split('.')[0])
-        # submission_mean = submission_mean.append(pd.Series(result_mean, index=submission_mean.columns), ignore_index=True)
-
         # gmean
         result_gmean = gmean(outputs.cpu().numpy(), axis=0)
         result_gmean = result_gmean.max(axis=0).tolist()
         result_gmean.insert(0, address.split('/')[-1].split('.')[0])
         submission_gmean = submission_gmean.append(pd.Series(result_gmean, index=submission_gmean.columns), ignore_index=True)
     
-    # submission_mean.to_csv('submission/legacy_seresnet34_mean.csv', index=False)
-    submission_gmean.to_csv('submission/legacy_seresnet34_best_acc.csv', index=False)
+    submission_gmean.to_csv('submission/' + num + '.csv', index=False)
     print('finish')

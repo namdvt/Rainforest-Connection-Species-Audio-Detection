@@ -62,9 +62,9 @@ def count_parameters(model):
         if not parameter.requires_grad: continue
         param = parameter.numel()
         table.add_row([name, param])
-        total_params+=param
-    print(table)
-    print(f"Total Trainable Params: {total_params}")
+        total_params += param
+    # print(table)
+    # print(f"Total Trainable Params: {total_params}")
     return total_params
 
 
@@ -90,40 +90,157 @@ class Model(nn.Module):
     def __init__(self, backbone):
         super(Model, self).__init__()
         # backbone
-        # self.backbone = models.resnet50(pretrained=True)
-        backbone = timm.create_model(backbone, pretrained=True)
-
-        # self.backbone = ResNet(Bottleneck, [3, 4, 6, 3]) # r50
-        # self.backbone = ResNet(BasicBlock, [2, 2, 2, 2]) #r18
-        # backbone = ResNet(BasicBlock, [1, 1, 1, 1]) #r9
-        self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1]))
+        if backbone == 'selecsls42b':
+            from backbones.selecsls42b import create_model
+            self.backbone = create_model()
+        elif backbone == 'legacy_seresnet34':
+            from backbones.legacy_seresnet34 import create_model
+            self.backbone = create_model()
+        elif backbone == 'swsl_resnext50_32x4d':
+            from backbones.swsl_resnext50_32x4d import create_model
+            self.backbone = create_model()
+        else:
+            self.backbone = timm.create_model(backbone, pretrained=True)
+        
         self.classify = nn.Sequential(
-            # Linear(1000, 512),
+            Linear(1000, 512),
             nn.Linear(512, 24),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
-        # self._freeze()
 
-    def _freeze(self):
-        for p in self.backbone.parameters():
-            p.requires_grad = False
-
-    def forward(self, x, classify=True):
+    def forward(self, x, is_sigmoid=True):
         x = self.backbone(x)
-        x = x.squeeze()
-        if classify:
-            x = self.classify(x)
+        x = self.classify(x)
+        if is_sigmoid:
+            x = torch.sigmoid(x)
 
         return x
 
 
-if __name__ == '__main__':
-    sample = torch.zeros((2, 3, 128, 938))
-    net = Model('regnetx_064')
-    # au = Auxiliary()
-    # weight = torch.load('output/weight_backbone.pth', map_location='cuda')
-    # weight_filtered = {k: v for k, v in weight.items() if k in net.state_dict()}
+class Conv1d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, dilation=1, dropout=0):
+        super(Conv1d, self).__init__()
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding, stride=stride, bias=bias,
+                              dilation=dilation)
+        self.bn = nn.BatchNorm1d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.dropout = nn.Dropout(p=dropout)
 
-    layer1, layer2, layer3, x = net(sample)
-    layer1, layer2, layer3 = au(layer1, layer2, layer3)
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for c in self.modules():
+            if isinstance(c, nn.Conv1d):
+                nn.init.xavier_uniform_(c.weight)
+                if c.bias is not None:
+                    nn.init.constant_(c.bias, 0.)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        return x
+
+
+class SubBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, padding=0, num_blocks=1, dropout=0):
+        super(SubBlock, self).__init__()
+        self.conv1x1 = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=1),
+            nn.BatchNorm1d(out_channels)
+        )
+
+        self.conv = nn.Sequential()
+        self.conv.add_module('first_conv', Conv1d(in_channels, out_channels, kernel_size=kernel_size, padding=padding, dropout=dropout))
+        for i in range(num_blocks - 1):
+            self.conv.add_module(str(i), Conv1d(out_channels, out_channels, kernel_size=kernel_size, padding=padding, dropout=dropout))
+        self.conv.add_module('conv1d', nn.Conv1d(out_channels, out_channels, kernel_size=kernel_size, padding=padding))
+        self.conv.add_module('bn', nn.BatchNorm1d(out_channels))
+        self.conv.add_module('dropout', nn.Dropout(p=dropout))
+        self.bn_relu = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        x_shortcut = x.clone()
+        x_shortcut = self.conv1x1(x_shortcut)
+
+        x = self.conv(x)
+        x += x_shortcut
+        x = self.bn_relu(x)
+
+        return x
+
+
+class MainBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, padding=0, dropout=0):
+        super(MainBlock, self).__init__()
+        self.conv = nn.Sequential(
+            SubBlock(in_channels, out_channels, kernel_size=kernel_size, padding=padding, dropout=dropout, num_blocks=2),
+            SubBlock(out_channels, out_channels, kernel_size=kernel_size, padding=padding, dropout=dropout, num_blocks=2),
+        )
+
+    def forward(self, x):
+        x = self.conv(x)
+
+        return x
+
+
+class Model1DCNN(nn.Module):
+    def __init__(self):
+        super(Model1DCNN, self).__init__()
+        self.blocks = nn.Sequential(
+            Conv1d(1, 128, kernel_size=3, stride=1),
+            MainBlock(128, 128, kernel_size=3, padding=1, dropout=0),
+            nn.MaxPool1d(3),
+            MainBlock(128, 256, kernel_size=3, padding=1, dropout=0),
+            # nn.MaxPool1d(3),
+            # MainBlock(128, 512, kernel_size=3, padding=1, dropout=0),
+            # nn.MaxPool1d(3),
+            # MainBlock(512, 1024, kernel_size=3, padding=1, dropout=0),
+        )
+        self.classify = nn.Sequential(
+            nn.AdaptiveAvgPool1d(1),
+            Flatten(),
+            # Linear(1024, 512),
+            Linear(256, 128),
+            nn.Linear(128, 24),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x, classify=True):
+        x = self.blocks(x)
+        if classify:
+            x = self.classify(x)
+        return x
+
+
+class Model1DCNNSimple(nn.Module):
+    def __init__(self):
+        super(Model1DCNNSimple, self).__init__()
+        self.conv = nn.Sequential(
+            Conv1d(1, 32, kernel_size=3, padding=1),
+            Conv1d(32, 64, kernel_size=3, padding=1),
+            nn.MaxPool1d(2),
+            Conv1d(64, 64, kernel_size=3, padding=1),
+            Conv1d(64, 128, kernel_size=3, padding=1),
+            nn.MaxPool1d(2),
+            Conv1d(128, 128, kernel_size=3, padding=1),
+            Conv1d(128, 256, kernel_size=3, padding=1),
+            nn.MaxPool1d(2),
+            Conv1d(256, 256, kernel_size=3, padding=1),
+            Conv1d(256, 512, kernel_size=3, padding=1),
+        )
+
+
+if __name__ == '__main__':
+    # from tqdm import tqdm
+    # for m in (timm.list_models()):
+    #     model = timm.create_model(m)
+    #     print(m, count_parameters(model))
+
+    model = Model('swsl_resnext50_32x4d')
+    model.load_state_dict(torch.load('output/16/swsl_resnext50_32x4d_1.pth', map_location='cpu'), strict=True)
     print()

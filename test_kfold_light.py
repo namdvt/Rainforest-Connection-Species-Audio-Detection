@@ -23,23 +23,25 @@ print('inferencing model ' + backbone)
 
 if __name__ == '__main__':
     model = Model(backbone=backbone).to(device)
-    weights = glob('output/best_loss/*.pth')
+    weights = glob('output/2/*.pth')
     # weights = ['output/regnetx_064_1.pth', 'output/regnetx_064_2.pth']
-    test_data = glob('data_waveform/test/waveform/*.npy')
+    test_data = glob('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/test/waveform/*.npy')
     test_data.sort()
     final_result = list()
-    submission_mean = pd.DataFrame(
-        columns=['recording_id', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13',
-                 's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 's22', 's23'])
-    submission_gmean = pd.DataFrame(
+    submission = pd.DataFrame(
         columns=['recording_id', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13',
                  's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 's22', 's23'])
     final_results = {}
     for weight in weights:
+        fold = int(weight.split('.pth')[0].split('_')[-1]) - 1
         model.load_state_dict(torch.load(weight, map_location=device))
         model.eval()
 
         for address in tqdm(test_data):
+            sample_name = address.split('/')[-1].split('.')[0]
+            if sample_name not in final_results:
+                final_results[sample_name] = torch.zeros((5, 50, 24)).to(device)
+
             full_spec = np.load(address)
             full_spec = lib.feature.melspectrogram(full_spec, sr=sr)
             full_spec = lib.power_to_db(full_spec)
@@ -56,29 +58,14 @@ if __name__ == '__main__':
             outputs = list()
             with torch.no_grad():
                 output = model(batch)
-                output = torch.max(output, dim=0)[0]
-                torch.cuda.empty_cache()
+                final_results[sample_name][fold] = output
+                # torch.cuda.empty_cache()
 
-            # get final results from all models
-            file_name = address.split('/')[-1].split('.')[0]
-            if file_name in final_results:
-                final_results[file_name].append(output)
-            else:
-                final_results[file_name] = list()
-                final_results[file_name].append(output)
-
-    # mean
-    for file_name in final_results.keys():
-        result = torch.stack(final_results[file_name]).mean(dim=0).tolist()
-        result.insert(0, file_name)
-        submission_mean = submission_mean.append(pd.Series(result, index=submission_mean.columns), ignore_index=True)
-    submission_mean.to_csv('submission/legacy_seresnet34_best_loss_mean.csv', index=False)
-
-    # gmean
-    for file_name in final_results.keys():
-        result = gmean(torch.stack(final_results[file_name]).cpu(), axis=0).tolist()
-        result.insert(0, file_name)
-        submission_gmean = submission_gmean.append(pd.Series(result, index=submission_gmean.columns), ignore_index=True)
-    submission_gmean.to_csv('submission/legacy_seresnet34_best_loss_gmean.csv', index=False)
+    # export to csv
+    for sample_name in final_results.keys():
+        sample_result = gmean(final_results[sample_name].cpu()).max(axis=0).tolist()
+        sample_result.insert(0, sample_name)
+        submission = submission.append(pd.Series(sample_result, index=submission.columns), ignore_index=True)
+    submission.to_csv('submission/2_light.csv', index=False)
 
     print()
