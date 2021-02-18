@@ -5,11 +5,9 @@ import numpy as np
 import os
 from dataset.sound_dataset_random import get_loader
 from loss.bceloss import BCELoss
-import torch.nn as nn
 
 from model.model import Model
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from sklearn.metrics import label_ranking_average_precision_score
 
 import argparse
@@ -46,7 +44,6 @@ def fit(epoch, model, optimizer, criterion, device, data_loader, phase='training
 
             if phase == 'validation':
                 rank = label_ranking_average_precision_score(target[:, 1:].detach().cpu().numpy().astype(int), output.detach().cpu().numpy())
-                # rank = label_ranking_average_precision_score(target.detach().cpu().numpy().astype(int), output.detach().cpu().numpy())
                 running_rank += rank
 
             if phase == 'training':
@@ -80,10 +77,6 @@ def train(args):
     except:
         pass
 
-    # freeze
-    # for p in model.backbone.parameters():
-    #     p.requires_grad = False
-
     # train
     num_epochs = args.num_epochs
 
@@ -108,18 +101,6 @@ def train(args):
         else:
             num_not_improve += 1
 
-        # if epoch == 0:
-        #     torch.save(model.state_dict(), args.output_folder + args.backbone + '_' + args.fold + 'rank.pth')
-        #     torch.save(model.state_dict(), args.output_folder + args.backbone + '_' + args.fold + 'loss.pth')
-        # elif val_epoch_rank >= np.max(val_ranks):
-        #     torch.save(model.state_dict(), args.output_folder + args.backbone + '_' + args.fold + 'rank.pth')
-        #     num_not_improve = 0
-        # elif val_epoch_loss <= np.min(val_losses):
-        #     torch.save(model.state_dict(), args.output_folder + args.backbone + '_' + args.fold + 'loss.pth')
-        #     num_not_improve = 0
-        # else:
-        #     num_not_improve += 1
-
         train_losses.append(train_epoch_loss)
         val_losses.append(val_epoch_loss)
         val_ranks.append(val_epoch_rank)
@@ -137,6 +118,7 @@ def train(args):
             results.write(args.backbone + ' ' + args.fold + ' ' + str(args.prop_tp) + ' ' + str(args.alpha) + ' : ' + str(np.min(val_losses)) + ' ' + str(np.max(val_ranks)) + '\n')
             results.close()
             break
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='rainforest training')
