@@ -18,7 +18,7 @@ def write_annotation():
 
 
 def write_annotation_all_tp():
-    df = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_tp.csv')
+    df = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
     all_tp = open('data_melspec/all_tp.txt', 'w+')
     sound_list = df['recording_id'].unique()
     for name in sound_list:
@@ -57,7 +57,7 @@ def select_fp_val():
             file_val_list.append(file_name)
 
     # get corresponding file name to fp val list
-    fp_all = glob('/home/cybercore/nam/rainforest/data_melspec/train_fp/*.npy')
+    fp_all = glob('/home/rainforest/data_melspec/train_fp/*.npy')
     fp_train = open('fp_train.txt', 'w+')
     fp_val = open('fp_val.txt', 'w+')
 
@@ -82,7 +82,7 @@ def write_file(location, all_list, val_list):
 
 
 def write_kfold():
-    tp = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_tp.csv')
+    tp = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
     all_list = set()
     for row in tqdm(tp.iterrows()):
         all_list.add(row[1]['recording_id'])

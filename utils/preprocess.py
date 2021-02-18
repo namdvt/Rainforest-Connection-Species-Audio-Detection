@@ -9,7 +9,7 @@ from scipy.signal import butter, lfilter, freqz
 sr = 48000
 
 def export_species():
-    tp = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_fp.csv')
+    tp = pd.read_csv('/home/datasets/rain_forest/train_fp.csv')
     for row in tqdm(tp.iterrows()):
         recording_id = row[1]['recording_id']
         species = row[1]['species_id']
@@ -19,26 +19,26 @@ def export_species():
         f_min = row[1]['f_min']
         f_max = row[1]['f_max']
 
-        y, _ = lib.load('/home/cybercore/oldhome/datasets/rain_forest/train/' + recording_id + '.flac', sr=sr, offset=t_min, duration=t_max - t_min, res_type='kaiser_fast')
-        np.save('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/fp/' + recording_id + '_' + str(species) + '_' + str(songtype) + '_' + str(t_min) + '_' +
+        y, _ = lib.load('/home/datasets/rain_forest/train/' + recording_id + '.flac', sr=sr, offset=t_min, duration=t_max - t_min, res_type='kaiser_fast')
+        np.save('/home/datasets/rain_forest/data_waveform/fp/' + recording_id + '_' + str(species) + '_' + str(songtype) + '_' + str(t_min) + '_' +
                 str(t_max) + '_' + str(f_min) + '_' + str(f_max) + '.npy', y)
 
 
 def preprocess_test():
-    sound_list = glob('/home/cybercore/oldhome/datasets/rain_forest/train/*.flac')
+    sound_list = glob('/home/datasets/rain_forest/train/*.flac')
     for sound in tqdm(sound_list):
         y, _ = lib.load(sound, sr=sr, res_type='kaiser_fast')
-        np.save('/home/cybercore/oldhome/datasets/rain_forest/data_waveform/train_unlabel/' + sound.split('/')[-1].split('.')[0] +'.npy', y)
+        np.save('/home/datasets/rain_forest/data_waveform/train_unlabel/' + sound.split('/')[-1].split('.')[0] +'.npy', y)
 
 
 def preprocess_train():
     duration = 10
     overlap = 8
-    df = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_tp.csv')
+    df = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
 
     sound_list = df['recording_id'].values
     for name in tqdm(sound_list):
-        path = '/home/cybercore/oldhome/datasets/rain_forest/train/' + name + '.flac'
+        path = '/home/datasets/rain_forest/train/' + name + '.flac'
         
         infos = df.loc[df['recording_id'] == name].values.tolist()
         try:
@@ -80,11 +80,11 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
 
 
 def export_background():
-    df = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_tp.csv')
+    df = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
 
     sound_list = df['recording_id'].values
     for name in tqdm(sound_list):
-        path = '/home/cybercore/oldhome/datasets/rain_forest/train/' + name + '.flac'
+        path = '/home/datasets/rain_forest/train/' + name + '.flac'
         tmin = 60
         tmax = 0
         infos = df.loc[df['recording_id'] == name].values.tolist()
@@ -105,7 +105,7 @@ def export_background():
 
 
 def get_freq_range():
-    df = pd.read_csv('/home/cybercore/oldhome/datasets/rain_forest/train_tp.csv')
+    df = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
     species_list = df['species_id'].values
     # species_list.sort()
     freq_list = list()
@@ -122,5 +122,16 @@ def get_freq_range():
         freq_list.append((fmin, fmax))
     print()
 
+
+def preprocess_train60s():
+    df = pd.read_csv('/home/datasets/rain_forest/train_tp.csv')
+
+    for name, label in tqdm(zip(df['recording_id'].values, df['species_id'].values)):
+        path = '/home/datasets/rain_forest/train/' + name + '.flac'
+        waveform, _ = lib.load(path, sr=sr)
+        
+        np.save('/home/datasets/rain_forest/data_waveform/tp_60s/' + name + '_' + str(label) + '.npy', waveform)
+
+
 if __name__ == '__main__':
-    preprocess_test()
+    preprocess_train60s()
