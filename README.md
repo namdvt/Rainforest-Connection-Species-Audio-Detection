@@ -2,10 +2,10 @@
 My solution for [Rainforest Connection Species Audio Detection Challenge](https://www.kaggle.com/c/rfcx-species-audio-detection/overview), which achieved rank 50 (top 5%) in private leaderboard.
 Thank Quang, Tuan, Pikaman, your insights are valuable and I've learnt alot through this competition.
 ### Data Preprocessing
-- Audio files are clipped to 10s-segment with stride=1
+- Audio files are clipped to 10s-segment using a sliding window with stride=1
 - Convert to mel-sepctrogram (sr=48000)
 - Also use clipped data by t_max, t_min (TP and FP)
-- Splitted to folds by file name, consider the number of samples in each class for every folds
+- Splitted to folds by recording id, consider the number of samples in each class for every folds, using the iterative approach and check the std.
 ### Model
 - 2 best backbones are legacy_seresnet34 and selecsls42b
 - Use maxpool, avgpool in time and frequency domain, respectively instead of stride
@@ -15,10 +15,10 @@ Thank Quang, Tuan, Pikaman, your insights are valuable and I've learnt alot thro
 ### Training
 - Use bachsize=8, lr=0.01, CosineAnnealingWarmRestarts 30, 1
 - No augmentation
-- In every batches, randomly select 1 sample for 1 filename
+- In every batches, randomly select 1 sample for 1 recording id
 - Probalibity of TP/FP in one batch is 0.6/0.4
 ### Inference
-- Inference using stride=1, then max the results
+- Inference using a sliding window with stride=1, then max the results
 - Compute gmean for outputs from different folds
 ### Not work
 - Augmentation: mix, add noise, time stretch ...
@@ -31,3 +31,8 @@ Thank Quang, Tuan, Pikaman, your insights are valuable and I've learnt alot thro
 - Crop on frequency axis [discussion](https://www.kaggle.com/c/rfcx-species-audio-detection/discussion/220304)
 - Catastrophic forgetting [paper](https://arxiv.org/pdf/1612.00796.pdf)
 - Fix overconfidence [paper](https://arxiv.org/pdf/2002.10118.pdf), [discussion](https://www.kaggle.com/c/rfcx-species-audio-detection/discussion/220389)
+- Use pretrained model on sound data
+- Annotation [app](https://github.com/gaborfodor/wave-soundscape-annotation)
+- Augmentation by changing spectrogram creation settings (resampling methods, windows types)
+- Augmentation by merging with other datasets
+- Try CoordConv [paper](https://arxiv.org/pdf/1807.03247.pdf)
