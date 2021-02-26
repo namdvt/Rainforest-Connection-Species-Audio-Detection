@@ -36,3 +36,4 @@ Thank Quang, Tuan, Pikaman, your insights are valuable and I've learnt alot thro
 - Augmentation by changing spectrogram creation settings (resampling methods, windows types)
 - Augmentation by merging with other datasets
 - Try CoordConv [paper](https://arxiv.org/pdf/1807.03247.pdf)
+- Masked BCE loss
